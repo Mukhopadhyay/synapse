@@ -16,12 +16,14 @@ const NODE_RADIUS = { min: 1.5, max: 3 };
 const RING = 1.5;
 /** While the live layout moves, the notes repaint at most this often. */
 const MOVING_REPAINT_MS = 100;
+/** While the main view turns (idle spin, or Fit easing it upright), the notes repaint at most this often. */
+const TURNING_REPAINT_MS = 33;
 const DRAG_TOLERANCE = 3;
 const WHEEL_SENSITIVITY = 0.0015;
 const TAU = Math.PI * 2;
 
-/** The part of the graph the minimap shows: its centre in graph units and minimap px per graph unit. */
-type Frame = { x: number; y: number; scale: number };
+/** The part of the graph the minimap shows: its centre in graph units, minimap px per graph unit, and the main view's turn it was drawn at. */
+type Frame = { x: number; y: number; scale: number; angle: number };
 
 export type MinimapCanvases = { base: HTMLCanvasElement; overlay: HTMLCanvasElement };
 
@@ -33,9 +35,10 @@ function context2d(canvas: HTMLCanvasElement) {
 
 /**
  * The minimap: every visible note and edge in a small canvas, with the main camera's viewport as a
- * signal rectangle and the rest dimmed. The notes (base canvas) repaint when the scene changes,
- * throttled while the layout moves; the rectangle (overlay canvas) follows every camera move and
- * idle drift. Click centres the camera there, drag pans live, the wheel zooms. Returns a cleanup.
+ * signal rectangle and the rest dimmed. The notes are turned to match the main view, so the
+ * viewport is always an upright rectangle. The notes (base canvas) repaint when the scene changes,
+ * throttled while the layout moves or the view turns; the rectangle (overlay canvas) follows every
+ * camera move and idle drift. Click centres the camera there, drag pans live, the wheel zooms. Returns a cleanup.
  */
 export function createMinimap(canvases: MinimapCanvases, controller: MapController) {
   const { model } = controller;
@@ -50,13 +53,35 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
   let pending: ReturnType<typeof setTimeout> | undefined;
   let press: { start: Point; dragging: boolean } | null = null;
 
-  const toMini = (x: number, y: number): Point =>
-    frame ? { x: width / 2 + (x - frame.x) * frame.scale, y: height / 2 + (y - frame.y) * frame.scale } : { x: 0, y: 0 };
-  const toGraph = ({ x, y }: Point): Point =>
-    frame ? { x: frame.x + (x - width / 2) / frame.scale, y: frame.y + (y - height / 2) / frame.scale } : { x: 0, y: 0 };
+  const toMini = (x: number, y: number): Point => {
+    if (!frame) return { x: 0, y: 0 };
+    const cos = Math.cos(frame.angle);
+    const sin = Math.sin(frame.angle);
+    const dx = x - frame.x;
+    const dy = y - frame.y;
+    return { x: width / 2 + (cos * dx - sin * dy) * frame.scale, y: height / 2 + (sin * dx + cos * dy) * frame.scale };
+  };
+  const toGraph = ({ x, y }: Point): Point => {
+    if (!frame) return { x: 0, y: 0 };
+    const cos = Math.cos(frame.angle);
+    const sin = Math.sin(frame.angle);
+    const dx = (x - width / 2) / frame.scale;
+    const dy = (y - height / 2) / frame.scale;
+    return { x: frame.x + cos * dx + sin * dy, y: frame.y - sin * dx + cos * dy };
+  };
 
-  /** Fits the visible notes, padded, into the minimap's shape. */
-  function computeFrame(): Frame | null {
+  /** How far the main view is turned on screen, in radians, read from its corners. */
+  function viewAngle() {
+    const corners = controller.viewport();
+    if (!corners) return 0;
+    const [topLeft, topRight] = corners;
+    return Math.atan2(topLeft.y - topRight.y, topRight.x - topLeft.x);
+  }
+
+  /** Fits the visible notes, turned by `angle` and padded, into the minimap's shape. */
+  function computeFrame(angle: number): Frame | null {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
     let left = Infinity;
     let right = -Infinity;
     let top = Infinity;
@@ -66,15 +91,23 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
       const position = layout.position(id);
       if (!position) return;
       const radius = layout.radius(id);
-      left = Math.min(left, (position.x ?? 0) - radius);
-      right = Math.max(right, (position.x ?? 0) + radius);
-      top = Math.min(top, (position.y ?? 0) - radius);
-      bottom = Math.max(bottom, (position.y ?? 0) + radius);
+      const x = cos * (position.x ?? 0) - sin * (position.y ?? 0);
+      const y = sin * (position.x ?? 0) + cos * (position.y ?? 0);
+      left = Math.min(left, x - radius);
+      right = Math.max(right, x + radius);
+      top = Math.min(top, y - radius);
+      bottom = Math.max(bottom, y + radius);
     });
     if (!Number.isFinite(left) || width === 0 || height === 0) return null;
     const spanX = Math.max(1, right - left) * (1 + PAD.x * 2);
     const spanY = Math.max(1, bottom - top) * (1 + PAD.y * 2);
-    return { x: (left + right) / 2, y: (top + bottom) / 2, scale: Math.min(width / spanX, height / spanY) };
+    const centre = { x: (left + right) / 2, y: (top + bottom) / 2 };
+    return {
+      x: cos * centre.x + sin * centre.y,
+      y: -sin * centre.x + cos * centre.y,
+      scale: Math.min(width / spanX, height / spanY),
+      angle,
+    };
   }
 
   function drawGrid(palette: Palette) {
@@ -98,7 +131,8 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
     base.fillStyle = cssColor(palette.background);
     base.fillRect(0, 0, width, height);
     drawGrid(palette);
-    if (!frame || !layout.isMoving()) frame = computeFrame();
+    const angle = viewAngle();
+    if (!frame || !layout.isMoving() || frame.angle !== angle) frame = computeFrame(angle);
     if (!frame) return;
 
     base.beginPath();
@@ -165,56 +199,56 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
     }
   }
 
-  /** The main camera's viewport: a rounded signal rectangle (turned with any rotation), everything around it dimmed. */
+  /** The main camera's viewport: an upright rounded signal rectangle, everything around it dimmed. */
   function drawOverlay() {
     overlay.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     overlay.clearRect(0, 0, width, height);
     const corners = controller.viewport();
     if (!frame || !corners) return;
-    const [topLeft, topRight, , bottomLeft] = corners.map((corner) => toMini(corner.x, corner.y));
-    const angle = Math.atan2(topRight.y - topLeft.y, topRight.x - topLeft.x);
-    const across = Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y);
-    const down = Math.hypot(bottomLeft.x - topLeft.x, bottomLeft.y - topLeft.y);
-    const centre = { x: (topRight.x + bottomLeft.x) / 2, y: (topRight.y + bottomLeft.y) / 2 };
+    const points = corners.map((corner) => toMini(corner.x, corner.y));
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
     const insetX = width * VIEW_INSET + VIEW_STROKE / 2;
     const insetY = height * VIEW_INSET + VIEW_STROKE / 2;
-    const left = Math.min(width - insetX - 2, Math.max(insetX, centre.x - across / 2));
-    const right = Math.max(left + 2, Math.min(width - insetX, centre.x + across / 2));
-    const top = Math.min(height - insetY - 2, Math.max(insetY, centre.y - down / 2));
-    const bottom = Math.max(top + 2, Math.min(height - insetY, centre.y + down / 2));
-    const box = { x: (left + right) / 2, y: (top + bottom) / 2, width: right - left, height: bottom - top };
+    const left = Math.min(width - insetX - 2, Math.max(insetX, Math.min(...xs)));
+    const right = Math.max(left + 2, Math.min(width - insetX, Math.max(...xs)));
+    const top = Math.min(height - insetY - 2, Math.max(insetY, Math.min(...ys)));
+    const bottom = Math.max(top + 2, Math.min(height - insetY, Math.max(...ys)));
 
-    const viewPath = () => {
-      overlay.save();
-      overlay.translate(box.x, box.y);
-      overlay.rotate(angle);
-      overlay.roundRect(-box.width / 2, -box.height / 2, box.width, box.height, VIEW_RADIUS);
-      overlay.restore();
-    };
     const palette = model.palette();
     overlay.beginPath();
     overlay.rect(0, 0, width, height);
-    viewPath();
+    overlay.roundRect(left, top, right - left, bottom - top, VIEW_RADIUS);
     overlay.fillStyle = cssColor(palette.minimapScrim);
     overlay.fill("evenodd");
     overlay.beginPath();
-    viewPath();
+    overlay.roundRect(left, top, right - left, bottom - top, VIEW_RADIUS);
     overlay.lineWidth = VIEW_STROKE;
     overlay.strokeStyle = cssColor(palette.signal);
     overlay.stroke();
   }
 
-  function onScene() {
-    const wait = MOVING_REPAINT_MS - (performance.now() - lastBase);
-    if (layout.isMoving() && wait > 0) {
-      pending ??= setTimeout(() => {
-        drawBase();
-        drawOverlay();
-      }, wait);
-      return;
-    }
+  function repaint() {
     drawBase();
     drawOverlay();
+  }
+
+  /** Repaints the notes now, or once `throttle` ms have passed since the last time. */
+  function requestBase(throttle: number) {
+    const wait = throttle - (performance.now() - lastBase);
+    if (wait > 0) {
+      pending ??= setTimeout(repaint, wait);
+      return;
+    }
+    repaint();
+  }
+
+  const onScene = () => requestBase(layout.isMoving() ? MOVING_REPAINT_MS : 0);
+
+  /** The rectangle follows at once; a turned view also turns the notes, throttled. */
+  function onView() {
+    drawOverlay();
+    if (frame && viewAngle() !== frame.angle) requestBase(TURNING_REPAINT_MS);
   }
 
   function resize() {
@@ -227,8 +261,7 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
       canvas.height = Math.round(height * pixelRatio);
     }
     frame = null;
-    drawBase();
-    drawOverlay();
+    repaint();
   }
 
   const localPoint = (event: PointerEvent | WheelEvent): Point => {
@@ -267,7 +300,7 @@ export function createMinimap(canvases: MinimapCanvases, controller: MapControll
   observer.observe(canvases.base);
   resize();
   const stopScene = controller.onSceneChange(onScene);
-  const stopView = controller.onViewChange(drawOverlay);
+  const stopView = controller.onViewChange(onView);
   const target = canvases.overlay;
   target.addEventListener("pointerdown", onPointerDown);
   target.addEventListener("pointermove", onPointerMove);

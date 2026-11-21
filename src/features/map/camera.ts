@@ -24,7 +24,7 @@ export type FitItem = { x: number; y: number; radius: number; label: { width: nu
 
 /**
  * The 2D camera: graph ↔ screen transforms, pans, zooms towards a point, and animated moves.
- * Besides position and zoom it keeps a small rotation, left behind when idle drift is baked in;
+ * Besides position and zoom it keeps a rotation, left behind when the idle spin is baked in;
  * Fit and restored cameras ease it back to zero. `onChange(base)` runs after every change: `base`
  * is false when only the drift offset moved, so history saves can ignore it.
  */
@@ -170,6 +170,21 @@ export function createCamera(onChange: (base: boolean) => void) {
     },
     /** Graph units per screen px as drawn, drift included. */
     ratio: () => state.ratio / offset.zoom,
+    /**
+     * The graph-unit shift that keeps whatever sits under screen point `pivot` in place when the
+     * view turns by an extra `extraAngle` and zooms by `zoom`, so drift spins around that point.
+     */
+    pivotOffset(pivot: Point, extraAngle: number, zoom: number): Point {
+      const sx = pivot.x - width / 2;
+      const sy = pivot.y - height / 2;
+      const turn = (a: number, scale: number): Point => ({
+        x: (Math.cos(a) * sx + Math.sin(a) * sy) * scale,
+        y: (-Math.sin(a) * sx + Math.cos(a) * sy) * scale,
+      });
+      const before = turn(angle, state.ratio);
+      const after = turn(angle + extraAngle, state.ratio / zoom);
+      return { x: before.x - after.x, y: before.y - after.y };
+    },
     /** The drift offset, redrawn but never saved. */
     setOffset(next: ViewOffset) {
       offset = next;

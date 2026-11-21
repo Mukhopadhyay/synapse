@@ -1,19 +1,29 @@
 import type { ViewOffset } from "./camera";
 
-const IDLE_MS = 8000;
+const IDLE_MS = 2000;
 const RAMP_MS = 3000;
 const TAU = Math.PI * 2;
-/** Each motion is a slow sine with its own period, so the orbit never visibly repeats. */
+/** The float: each motion is a slow sine with its own period, so it never visibly repeats. */
 const PAN_X = { amplitude: 0.012, period: 47_000 };
 const PAN_Y = { amplitude: 0.015, period: 61_000 };
 const ZOOM = { amplitude: 0.012, period: 53_000 };
-const ROTATION = { amplitude: (0.9 * Math.PI) / 180, period: 89_000 };
+/** The spin: one full turn every 8 minutes, in radians per ms. */
+// const SPIN = TAU / 480_000;
+const SPIN = TAU / 60_000;
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
+/** How far the spin has turned after `elapsed` ms: its speed eases in with the ramp (the integral of smoothstep), then holds. */
+function spinAngle(elapsed: number) {
+  if (elapsed >= RAMP_MS) return SPIN * (elapsed - RAMP_MS / 2);
+  const u = elapsed / RAMP_MS;
+  return SPIN * RAMP_MS * (u ** 3 - u ** 4 / 2);
+}
+
 /**
  * The drift `elapsed` ms after it began, for a viewport of `width` × `height` px at `ratio` graph
- * units per px. Every term is zero at the start and the amplitude eases in over 3s, so it never jumps.
+ * units per px: a slow spin with a gentle float. Every term is zero at the start and eases in over
+ * 3s, so it never jumps. The pan is the float alone; the renderer keeps the spin centred.
  */
 export function driftOffset(elapsed: number, width: number, height: number, ratio: number): ViewOffset {
   const ramp = smoothstep(Math.min(1, elapsed / RAMP_MS));
@@ -22,7 +32,7 @@ export function driftOffset(elapsed: number, width: number, height: number, rati
     dx: ramp * PAN_X.amplitude * width * Math.sin(phase(PAN_X.period)) * ratio,
     dy: ramp * PAN_Y.amplitude * height * Math.sin(phase(PAN_Y.period)) * ratio,
     zoom: 1 + ramp * ZOOM.amplitude * (1 - Math.cos(phase(ZOOM.period))),
-    angle: ramp * ROTATION.amplitude * Math.sin(phase(ROTATION.period)),
+    angle: spinAngle(elapsed),
   };
 }
 
@@ -36,7 +46,7 @@ type DriftHooks = {
 };
 
 /**
- * Idle drift: after 8s without input the camera starts a slow orbit, driven by the renderer's own
+ * Idle drift: after 8s without input the camera starts a slow spin, driven by the renderer's own
  * frame loop (`frame`). Any input stops it at once (`interrupt`), keeping where it got to.
  * The idle wait is a plain timeout, so nothing ticks while the map rests.
  */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { Maximize, Minus, Plus } from "lucide-react";
 
 import { useMapStore } from "@/lib/store/map-store";
@@ -10,9 +10,8 @@ import { cn } from "@/lib/utils";
 import { ControlButton } from "./control-button";
 import type { MapController } from "./map-controller";
 import { Minimap } from "./minimap";
+import { useMinimapLinger } from "./use-minimap-linger";
 
-/** How long the phone minimap stays after the last pan or pinch. */
-const MINIMAP_LINGER_MS = 1500;
 const BOTTOM = "bottom-[calc(--spacing(3)+env(safe-area-inset-bottom))]";
 
 /**
@@ -33,26 +32,7 @@ export function TouchZoomStack({ className, style }: { className?: string; style
 
 /** Bottom-left on phones: shows while a pan or pinch moves the camera and fades 1.5s after it stops. Tapping it jumps there. */
 function PhoneMinimap({ controller }: { controller: MapController }) {
-  const [active, setActive] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  useEffect(() => {
-    const linger = () => {
-      setActive(true);
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => setActive(false), MINIMAP_LINGER_MS);
-    };
-    const stop = controller.onGestureMove(linger);
-    return () => {
-      stop();
-      clearTimeout(timer.current);
-    };
-  }, [controller]);
-
-  const keepAlive = () => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setActive(false), MINIMAP_LINGER_MS);
-  };
+  const { active, keepAlive } = useMinimapLinger(controller.onGestureMove);
 
   return (
     <div
