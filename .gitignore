@@ -2,6 +2,7 @@
 
 notes/*
 docs/*
+COMPROMISES.md
 
 # dependencies
 /node_modules
