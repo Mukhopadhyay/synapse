@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Hairline's engine, kept byte for byte, and locally installed agent skills
+    "src/lib/hairline/kernel.js",
+    ".claude/**",
   ]),
 ]);
 
