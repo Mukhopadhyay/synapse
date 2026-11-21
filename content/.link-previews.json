@@ -1,0 +1,41 @@
+{
+  "https://arxiv.org/abs/2005.11401": {
+    "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+    "description": "Large pre-trained language models have been shown to store factual knowledge in their parameters, and achieve state-of-the-art results when fine-tuned on downstream NLP tasks. However, their ability to access and precisely manipulate knowledge is still limited, and hence on knowledge-intensive task…",
+    "siteName": "arXiv.org",
+    "domain": "arxiv.org",
+    "image": {
+      "src": "https://arxiv.org/static/browse/0.3.4/images/arxiv-logo-fb.png",
+      "width": 1200,
+      "height": 700
+    },
+    "favicon": "https://arxiv.org/static/browse/0.3.4/images/icons/favicon-32x32.png",
+    "fetchedAt": "2026-10-24T16:06:51.710Z"
+  },
+  "https://huggingface.co/docs/transformers/model_doc/rag": {
+    "title": "RAG · Hugging Face",
+    "description": "We’re on a journey to advance and democratize artificial intelligence through open source and open science.",
+    "siteName": "huggingface.co",
+    "domain": "huggingface.co",
+    "image": {
+      "src": "https://cdn-thumbnails.huggingface.co/social-thumbnails/docs/transformers/model_doc/rag.png",
+      "width": 1200,
+      "height": 648
+    },
+    "favicon": null,
+    "fetchedAt": "2026-10-24T16:06:52.272Z"
+  },
+  "https://www.anthropic.com/news/contextual-retrieval": {
+    "title": "Contextual retrieval in AI systems",
+    "description": "Contextual retrieval improves how AI systems access and use information, reducing retrieval failures in large knowledge bases.",
+    "siteName": "anthropic.com",
+    "domain": "anthropic.com",
+    "image": {
+      "src": "https://www-cdn.anthropic.com/images/4zrzovbb/website/627c6121174647bb38d09b522b98ebe8e627b3e0-1200x630.jpg",
+      "width": 1200,
+      "height": 630
+    },
+    "favicon": "https://www.anthropic.com/images/icons/favicon-32x32.png",
+    "fetchedAt": "2026-10-24T16:06:52.418Z"
+  }
+}

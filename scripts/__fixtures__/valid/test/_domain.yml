@@ -1,0 +1,6 @@
+name: Test
+color: domain-1
+clusters:
+  basics: Basics
+ghosts:
+  gamma: GAMMA function

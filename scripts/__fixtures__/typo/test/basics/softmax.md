@@ -1,0 +1,4 @@
+---
+title: Softmax
+related: [atention]
+---

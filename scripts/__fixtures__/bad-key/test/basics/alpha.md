@@ -1,0 +1,4 @@
+---
+title: Alpha
+require: [beta]
+---
