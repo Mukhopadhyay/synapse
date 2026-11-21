@@ -380,7 +380,12 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
     frame = 0;
     const { width, height } = camera.size();
     const offset = drift.frame(now, width, height, camera.get().ratio);
-    if (offset) camera.setOffset(offset);
+    if (offset) {
+      const { leftInset, bottomInset } = store();
+      const pivot = { x: leftInset + (width - leftInset) / 2, y: (height - bottomInset) / 2 };
+      const centred = camera.pivotOffset(pivot, offset.angle, offset.zoom);
+      camera.setOffset({ ...offset, dx: offset.dx + centred.x, dy: offset.dy + centred.y });
+    }
     const drewMain = dirty;
     if (dirty) {
       dirty = drawMain();
