@@ -4,12 +4,12 @@ import type { CSSProperties } from "react";
 import { Maximize, Minus, Plus } from "lucide-react";
 
 import { useMapStore } from "@/lib/store/map-store";
-import { usePrefsStore } from "@/lib/store/prefs-store";
 import { cn } from "@/lib/utils";
 
 import { ControlButton } from "./control-button";
 import type { MapController } from "./map-controller";
 import { Minimap } from "./minimap";
+import { useMinimap } from "./use-minimap";
 import { useMinimapLinger } from "./use-minimap-linger";
 
 const BOTTOM = "bottom-[calc(--spacing(3)+env(safe-area-inset-bottom))]";
@@ -54,17 +54,17 @@ function PhoneMinimap({ controller }: { controller: MapController }) {
  */
 export function MobileControls({ controller }: { controller: MapController }) {
   const sheetOpen = useMapStore((state) => state.selectedId !== null);
-  const bottomInset = useMapStore((state) => state.bottomInset);
-  const minimap = usePrefsStore((state) => state.minimap);
+  const lift = useMapStore(({ overlays: { welcome } }) => (welcome?.corner.startsWith("bottom") ? welcome.y + welcome.height : 0));
+  const { on: minimap } = useMinimap(controller);
 
   if (sheetOpen) return null;
   return (
     <>
       <TouchZoomStack
         className={cn("absolute right-3 z-overlay transition-transform duration-base ease-standard", BOTTOM)}
-        style={bottomInset ? { transform: `translateY(${-bottomInset}px)` } : undefined}
+        style={lift ? { transform: `translateY(${-lift}px)` } : undefined}
       />
-      {minimap && bottomInset === 0 && <PhoneMinimap controller={controller} />}
+      {minimap && lift === 0 && <PhoneMinimap controller={controller} />}
     </>
   );
 }

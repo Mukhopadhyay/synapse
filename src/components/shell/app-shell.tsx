@@ -1,3 +1,4 @@
+import { fieldStats } from "@/features/landing/field-stats";
 import { MenuLegend } from "@/features/legend/menu-legend";
 import { ListView } from "@/features/list/list-view";
 import { MapCanvas } from "@/features/map/map-canvas";
@@ -19,11 +20,12 @@ import { TopBar } from "./top-bar";
  * /<domain>/graph/<slug>; the route only decides which domain is drawn and what the panel shows.
  */
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const { domains, nodes } = await loadGraph();
-  const summaries = domains.map(({ id, name, color, description }) => ({ id, name, color, description }));
-  const fields = summaries.map((summary) => {
-    const notes = nodes.filter((node) => node.domain === summary.id);
-    return { ...summary, mostlyUnwritten: notes.filter((node) => node.ghost || node.stub).length > notes.length / 2 };
+  const graph = await loadGraph();
+  const summaries = graph.domains.map(({ id, name, color, description }) => ({ id, name, color, description }));
+  const stats = fieldStats(graph);
+  const fields = summaries.map((summary, index) => {
+    const { written, stubs, unwritten } = stats[index];
+    return { ...summary, written, stubs, unwritten };
   });
 
   return (

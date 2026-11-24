@@ -4,13 +4,14 @@ import { useEffect, useState, type FocusEvent } from "react";
 import { Maximize, Minus, Plus, SlidersHorizontal, MapIcon } from "lucide-react";
 import { Toolbar } from "radix-ui";
 
-import { usePrefsStore } from "@/lib/store/prefs-store";
 import { cn } from "@/lib/utils";
 
 import { ControlButton } from "./control-button";
 import type { MapController } from "./map-controller";
 import { Minimap } from "./minimap";
+import { useMinimap } from "./use-minimap";
 import { useMinimapLinger } from "./use-minimap-linger";
+import { TRANSIENT_OVERLAY } from "./use-map-overlay";
 import { ZoomReadout } from "./zoom-readout";
 
 type Props = { controller: MapController; settingsOpen: boolean; onToggleSettings: () => void };
@@ -20,11 +21,10 @@ type Props = { controller: MapController; settingsOpen: boolean; onToggleSetting
  * readout, zoom in, fit, graph settings and the minimap toggle. With the minimap off it is the
  * toolbar alone. The minimap folds away at rest: it opens upward while the camera moves (not
  * idle drift) and while the panel is hovered or keyboard-focused, then fades 1.5s later. It stays
- * folded while graph settings are open above it.
+ * folded while graph settings are open above it. By default it exists only for big graphs.
  */
 export function Navigator({ controller, settingsOpen, onToggleSettings }: Props) {
-  const minimap = usePrefsStore((state) => state.minimap);
-  const setPrefs = usePrefsStore((state) => state.set);
+  const { on: minimap, toggle: toggleMinimap } = useMinimap(controller);
   const { active, hold } = useMinimapLinger(controller.onCameraChange);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -46,6 +46,7 @@ export function Navigator({ controller, settingsOpen, onToggleSettings }: Props)
     >
       {minimap && (
         <div
+          {...TRANSIENT_OVERLAY}
           className={cn(
             "grid transition-[grid-template-rows,opacity] duration-base ease-standard",
             open ? "grid-rows-[1fr] opacity-100" : "pointer-events-none grid-rows-[0fr] opacity-0",
@@ -81,7 +82,7 @@ export function Navigator({ controller, settingsOpen, onToggleSettings }: Props)
           />
         </Toolbar.Button>
         <Toolbar.Button asChild>
-          <ControlButton side="top" label="Minimap" shortcut="M" icon={MapIcon} pressed={minimap} onClick={() => setPrefs({ minimap: !minimap })} />
+          <ControlButton side="top" label="Minimap" shortcut="M" icon={MapIcon} pressed={minimap} onClick={toggleMinimap} />
         </Toolbar.Button>
       </Toolbar.Root>
     </div>

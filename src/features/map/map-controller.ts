@@ -6,8 +6,11 @@ import { useMapStore, type CameraRequest, type Insets } from "@/lib/store/map-st
 import { ZOOM_STEP, type Point } from "./camera";
 import { createMapModel } from "./map-model";
 import type { MapRenderer } from "./renderer";
+import { zoomPercent } from "./zoom";
 
 const NO_INSETS: Insets = { right: 0, bottom: 0 };
+/** With the minimap on "auto", it shows only for big graphs: this many notes, or a fit below this zoom (1 = 100%). */
+const MINIMAP_AUTO = { nodes: 80, fitZoom: 0.5 };
 
 /** Listeners that outlive any one renderer, so chrome can subscribe before the canvas mounts. */
 function createSignal() {
@@ -78,8 +81,7 @@ export function createMapController(data: GraphData, domains: string[]) {
       if (state.cameraRequest !== previous.cameraRequest) apply(state.cameraRequest, true);
       if (previous.selectedId && !state.selectedId && !requested) recentre(previous.insets);
       if (state.focusedId && state.focusedId !== previous.focusedId) next.reveal(state.focusedId);
-      const overlayMoved = state.leftInset !== previous.leftInset || state.bottomInset !== previous.bottomInset;
-      if (overlayMoved && !state.interacted && !state.selectedId) next.fit(openInsets());
+      if (state.overlays !== previous.overlays && !state.interacted && !state.selectedId) next.fit(openInsets());
     });
 
     /** A camera belongs to the entry whose URL matches the current selection. */
@@ -134,6 +136,7 @@ export function createMapController(data: GraphData, domains: string[]) {
     breadcrumb: model.breadcrumb,
     keyboardOrder: model.keyboardOrder,
     viewportPosition: (id: string) => renderer?.viewportPosition(id) ?? null,
+    neighbourBoxes: (id: string) => renderer?.neighbourBoxes(id) ?? [],
     pickAt: (clientX: number, clientY: number, pointerType: string) => renderer?.pickAt(clientX, clientY, pointerType) ?? null,
     cancelGesture: () => renderer?.cancelGesture(),
     zoomIn: (fast = false) => {
@@ -148,14 +151,12 @@ export function createMapController(data: GraphData, domains: string[]) {
       interacted();
       renderer?.panBy(dx, dy);
     },
+    /** Shows the whole graph, centred in the space the panel and overlays leave. Also the zoom readout's reset. */
     fit: () => renderer?.fit(openInsets()),
-    /** Back to 100% around the screen's centre. */
-    resetZoom: () => {
-      interacted();
-      renderer?.resetZoom();
-    },
-    /** Graph units per screen px (1 = 100%), without idle drift. */
-    zoomRatio: () => renderer?.getCamera().ratio ?? 1,
+    /** The zoom as a percentage of the last fit (Fit = 100%), without idle drift. */
+    zoomPercent: () => (renderer ? zoomPercent(renderer.fitRatio(), renderer.getCamera().ratio) : 100),
+    /** Whether the minimap earns its place on "auto": a big graph, or one that fits only when zoomed far out. */
+    minimapUseful: () => model.graph.order > MINIMAP_AUTO.nodes || (renderer ? 1 / renderer.fitRatio() < MINIMAP_AUTO.fitZoom : false),
     /** Zooms around the screen's centre at once, for wheel input from the minimap. */
     zoomByNow: (factor: number) => {
       interacted();

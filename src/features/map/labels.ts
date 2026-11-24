@@ -125,20 +125,20 @@ export function pillBox({ x, y, radius, size, width: textWidth, side }: LabelPla
 }
 
 /** Hovered, focused or selected label: `foreground` on a `surface` pill with a hairline. */
-export function drawLabelPill(context: CanvasRenderingContext2D, placement: LabelPlacement, palette: Palette) {
+export function drawLabelPill(context: CanvasRenderingContext2D, placement: LabelPlacement, palette: Palette, opacity = 1) {
   const { y, label, size, fontFamily, weight } = placement;
   context.font = labelFont(size, fontFamily, weight);
   const { left, width, height } = pillBox(placement);
 
   context.beginPath();
   context.roundRect(left, y - height / 2, width, height, 6);
-  context.fillStyle = cssColor(palette.surface);
+  context.fillStyle = cssColor(scaleAlpha(palette.surface, opacity));
   context.fill();
   context.lineWidth = 1;
-  context.strokeStyle = cssColor(palette.border);
+  context.strokeStyle = cssColor(scaleAlpha(palette.border, opacity));
   context.stroke();
 
   context.textBaseline = "middle";
-  context.fillStyle = cssColor(palette.foreground);
+  context.fillStyle = cssColor(scaleAlpha(palette.foreground, opacity));
   context.fillText(label, left + PILL_PADDING_X, y);
 }

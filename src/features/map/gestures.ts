@@ -1,9 +1,10 @@
 import type { CameraControl, Point } from "./camera";
+import { wheelZoomFactor } from "./zoom";
 
 /** A pointer moving less than this between press and release is a tap, not a drag or pan. */
 const TAP_TOLERANCE = 4;
-const WHEEL_SENSITIVITY = 0.0015;
-const PINCH_WHEEL_SENSITIVITY = 0.012;
+/** After the camera moves on its own, the mouse must travel this far before hover picks again. */
+const HOVER_RESUME_DISTANCE = 2;
 
 export type GestureHandlers = {
   /** The node under a screen point, honouring the minimum hit radius for the pointer type. */
@@ -30,11 +31,14 @@ type Gesture =
 /**
  * Pointer, touch and wheel input on the map canvas: press-and-move on a node drags it, on empty
  * canvas pans; two fingers pinch; the wheel and trackpad pinch zoom towards the cursor; a press
- * without moving is a tap. Returns `cancel` (drop the current gesture) and `detach`.
+ * without moving is a tap. Returns `cancel` (drop the current gesture), `holdHover` and `detach`.
  */
 export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl, handlers: GestureHandlers) {
   const pointers = new Map<number, Point>();
   let gesture: Gesture | null = null;
+  let mouse: Point | null = null;
+  /** Where the mouse rested when the camera started moving on its own; hover waits until it leaves. */
+  let heldAt: Point | null = null;
 
   const localPoint = (event: MouseEvent): Point => {
     const rect = canvas.getBoundingClientRect();
@@ -55,6 +59,7 @@ export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl,
     camera.cancel();
     const point = localPoint(event);
     pointers.set(event.pointerId, point);
+    if (event.pointerType === "mouse") mouse = point;
     if (pointers.size === 1) gesture = { kind: "press", start: point, id: handlers.pick(point, event.pointerType), pointerType: event.pointerType };
     else if (pointers.size === 2) startPinch();
   }
@@ -62,6 +67,7 @@ export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl,
   function onPointerMove(event: PointerEvent) {
     const point = localPoint(event);
     if (pointers.has(event.pointerId)) pointers.set(event.pointerId, point);
+    if (event.pointerType === "mouse") mouse = point;
 
     if (gesture?.kind === "pinch" && pointers.size >= 2) {
       const [a, b] = [...pointers.values()];
@@ -94,7 +100,10 @@ export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl,
       return;
     }
 
-    if (event.pointerType === "mouse" && pointers.size === 0) handlers.hover(handlers.pick(point, "mouse"));
+    if (event.pointerType !== "mouse" || pointers.size > 0) return;
+    if (heldAt && Math.hypot(point.x - heldAt.x, point.y - heldAt.y) <= HOVER_RESUME_DISTANCE) return;
+    heldAt = null;
+    handlers.hover(handlers.pick(point, "mouse"));
   }
 
   function endPointer(event: PointerEvent, cancelled: boolean) {
@@ -110,23 +119,23 @@ export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl,
       gesture = { kind: "pan", start: remaining, camera: camera.get() };
     } else if (pointers.size === 0) {
       gesture = null;
-      if (event.pointerType === "mouse") handlers.hover(handlers.pick(localPoint(event), "mouse"));
+      if (event.pointerType === "mouse" && !heldAt) handlers.hover(handlers.pick(localPoint(event), "mouse"));
     }
   }
 
   const onPointerUp = (event: PointerEvent) => endPointer(event, false);
   const onPointerCancel = (event: PointerEvent) => endPointer(event, true);
   const onPointerLeave = (event: PointerEvent) => {
-    if (event.pointerType === "mouse" && pointers.size === 0) handlers.hover(null);
+    if (event.pointerType !== "mouse") return;
+    mouse = null;
+    if (pointers.size === 0) handlers.hover(null);
   };
 
   function onWheel(event: WheelEvent) {
     event.preventDefault();
     camera.cancel();
     handlers.interact();
-    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
-    const sensitivity = event.ctrlKey ? PINCH_WHEEL_SENSITIVITY : WHEEL_SENSITIVITY;
-    camera.zoomAround(localPoint(event), camera.get().ratio * Math.exp(delta * sensitivity));
+    camera.zoomAround(localPoint(event), camera.get().ratio * wheelZoomFactor(event, camera.size().height));
   }
 
   canvas.addEventListener("pointerdown", onPointerDown);
@@ -139,6 +148,14 @@ export function attachGestures(canvas: HTMLCanvasElement, camera: CameraControl,
   return {
     /** A pointer is down on the map. */
     active: () => pointers.size > 0,
+    /**
+     * The camera started moving by itself (fly-to, fit, keyboard zoom), so whatever sits under a
+     * resting mouse is about to change: hover waits until the mouse really moves again. Browsers
+     * also send zero-distance moves when layout shifts, which would otherwise pick a new node.
+     */
+    holdHover() {
+      heldAt = mouse;
+    },
     /** Drops whatever gesture is in progress, e.g. when a long press opens the context menu. */
     cancel() {
       if (gesture?.kind === "drag") handlers.dragEnd();

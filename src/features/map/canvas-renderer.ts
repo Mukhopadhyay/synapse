@@ -1,8 +1,8 @@
 import { ARROW_SIZE, LINE_DASHES } from "@/lib/content/relations";
 import { useSearchStore } from "@/features/search/search-store";
-import { useMapStore, type Insets } from "@/lib/store/map-store";
-
 import { prefersReducedMotion } from "@/lib/motion";
+import { overlayBoxes, overlaySides } from "@/lib/overlays";
+import { useMapStore, type Insets } from "@/lib/store/map-store";
 
 import { createBackdrop } from "./backdrop";
 import { createCamera, type FitItem, type Frame, type Point } from "./camera";
@@ -22,18 +22,21 @@ import {
   LABEL_GAP,
   PILL_PADDING_X,
   pillBox,
+  type LabelBox,
   type LabelPlacement,
   type LabelSide,
 } from "./labels";
 import { isTagNode, TAG_PREFIX, type EdgeStyle, type MapModel } from "./map-model";
 import { cssColor, mixColor, scaleAlpha, type Palette } from "./palette";
 import type { MapRenderer } from "./renderer";
+import { zoomOutLimit } from "./zoom";
 
 /** Minimum hit radius in px, whatever the drawn size. */
 const HIT_RADIUS = { mouse: 12, touch: 24 };
 const FOCUS_RING_GAP = 3;
-/** Space kept clear around the graph when fitting: below the top bar, above the legend and hint, and at the sides. */
+/** Space kept clear around the graph when fitting: below the top bar, above the hint, and past the sides and any overlay. */
 const FIT_MARGIN = { top: 72, bottom: 60, side: 24 };
+const NO_INSETS: Insets = { right: 0, bottom: 0 };
 /** A node closer than this to the edge is brought into view when it gets keyboard focus. */
 const REVEAL_MARGIN = 48;
 const LABEL_CULL_MARGIN = 200;
@@ -100,12 +103,21 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
   let signals: SignalEdge[] = [];
   let paletteSeen: Palette | null = null;
   let dragOffset: Point = { x: 0, y: 0 };
+  /** The ratio the last fit chose: the zoom readout's 100% and the base of the zoom-out limit. */
+  let fitRatio = 1;
+  let holdHover = () => {};
 
-  const camera = createCamera((base) => {
-    requestDraw();
-    viewListeners.forEach((listener) => listener());
-    if (base) cameraListeners.forEach((listener) => listener());
-  });
+  const camera = createCamera(
+    (base) => {
+      requestDraw();
+      viewListeners.forEach((listener) => listener());
+      if (base) cameraListeners.forEach((listener) => listener());
+    },
+    () => holdHover(),
+  );
+
+  /** The panel's insets while a note is open (the controls ride beside it then). */
+  const panelInsets = () => (store().selectedId ? store().insets : NO_INSETS);
 
   /** Nodes scale with zoom; labels keep their screen size. */
   const screenRadius = (size: number) => size / camera.ratio();
@@ -284,14 +296,13 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
     const pills = pinned.map((node) => ({ node, place: placement(node, size, fontFamily) }));
     for (const node of onScreen) grid.add({ left: node.x - node.radius, top: node.y - node.radius, width: node.radius * 2, height: node.radius * 2 });
     for (const { place } of pills) grid.add(pillBox(place));
-    const covered = store().leftInset;
-    if (covered) grid.add({ left: -LABEL_CULL_MARGIN, top: -size, width: covered + LABEL_CULL_MARGIN, height: height + size * 2 });
+    for (const box of overlayBoxes(Object.values(store().overlays), width, height, panelInsets())) grid.add(box);
     guardPills(pills.map(({ node, place }) => ({ id: node.id, box: pillBox(place), x: node.x, y: node.y })));
 
     const fallback = onScreen.length < LABEL_FALLBACK_LIMIT;
     const candidates = onScreen
       .filter((node) => node.style.label && !node.style.pinned)
-      .map((node) => ({ node, opacity: node.style.forceLabel ? 1 : model.labelOpacity(ratio, node.style.size) }))
+      .map((node) => ({ node, opacity: (node.style.forceLabel ? 1 : model.labelOpacity(ratio, node.style.size)) * node.style.labelAlpha }))
       .filter(({ opacity }) => opacity > 0.02)
       .sort(
         (a, b) =>
@@ -311,7 +322,7 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       drawNodeLabel(ctx, place, node.style.labelColor, palette.background, opacity);
     }
 
-    for (const { place } of pills) drawLabelPill(ctx, place, palette);
+    for (const { node, place } of pills) drawLabelPill(ctx, place, palette, node.style.labelAlpha);
   }
 
   /** Field names above each field on the all-fields map, in the `cluster-label` style. */
@@ -379,8 +390,8 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
     const { width, height } = camera.size();
     const offset = drift.frame(now, width, height, camera.get().ratio);
     if (offset) {
-      const { leftInset, bottomInset } = store();
-      const pivot = { x: leftInset + (width - leftInset) / 2, y: (height - bottomInset) / 2 };
+      const free = fitFrame(NO_INSETS);
+      const pivot = { x: free.left + (width - free.left - free.right) / 2, y: free.top + (height - free.top - free.bottom) / 2 };
       const centred = camera.pivotOffset(pivot, offset.angle, offset.zoom);
       camera.setOffset({ ...offset, dx: offset.dx + centred.x, dy: offset.dy + centred.y });
     }
@@ -421,12 +432,17 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
     return best;
   }
 
+  /** The part of the screen a fit may use: clear of the top bar, the panel's `insets` and every overlay. */
   function fitFrame(insets: Insets): Frame {
+    const { width, height } = camera.size();
+    const covered = overlaySides(Object.values(store().overlays), width, height, insets);
+    const top = Math.max(FIT_MARGIN.top, covered.top + FIT_MARGIN.side);
+    const bottom = Math.max(insets.bottom, covered.bottom);
     return {
-      top: FIT_MARGIN.top + (model.fieldLabels().length ? FIELD_LABEL_SIZE + FIELD_LABEL_GAP : 0),
-      left: FIT_MARGIN.side + store().leftInset,
-      right: FIT_MARGIN.side + insets.right,
-      bottom: (insets.bottom || store().bottomInset ? FIT_MARGIN.side : FIT_MARGIN.bottom) + insets.bottom + store().bottomInset,
+      top: top + (model.fieldLabels().length ? FIELD_LABEL_SIZE + FIELD_LABEL_GAP : 0),
+      left: FIT_MARGIN.side + covered.left,
+      right: FIT_MARGIN.side + Math.max(insets.right, covered.right),
+      bottom: Math.max(FIT_MARGIN.bottom, FIT_MARGIN.side + bottom),
     };
   }
 
@@ -480,6 +496,13 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       gestureListeners.forEach((listener) => listener());
     },
   });
+
+  /** A camera move under a resting mouse: drop the map hover (its node may slide away) until the mouse moves. */
+  holdHover = () => {
+    gestures.holdHover();
+    const { hoveredId, hoverSource, setHovered } = store();
+    if (hoveredId && hoverSource === "map") setHovered(null);
+  };
 
   const drift = createDrift({
     allowed() {
@@ -594,8 +617,12 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
     },
     fit(insets, animate = true) {
       drift.interrupt();
-      camera.animate(camera.fitting(fitItems, fitFrame(insets)), animate ? undefined : 0);
+      const target = camera.fitting(fitItems, fitFrame(insets));
+      fitRatio = target.ratio;
+      camera.setMaxRatio(zoomOutLimit(fitRatio));
+      camera.animate(target, animate ? undefined : 0);
     },
+    fitRatio: () => fitRatio,
     viewport() {
       const { width, height } = camera.size();
       return [camera.toGraph({ x: 0, y: 0 }), camera.toGraph({ x: width, y: 0 }), camera.toGraph({ x: width, y: height }), camera.toGraph({ x: 0, y: height })];
@@ -606,16 +633,26 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       camera.cancel();
       camera.set({ ...camera.get(), ...point });
     },
-    resetZoom() {
-      drift.interrupt();
-      camera.glide({ ratio: 1 });
-    },
     viewportPosition(id) {
       const node = layout.position(id);
       if (!node) return null;
       const rect = canvas.getBoundingClientRect();
       const point = camera.toScreen(node.x ?? 0, node.y ?? 0);
       return { x: point.x + rect.left, y: point.y + rect.top, radius: screenRadius(model.nodeStyle(id).size) };
+    },
+    neighbourBoxes(id) {
+      const rect = canvas.getBoundingClientRect();
+      const size = model.labelSize(camera.ratio());
+      const { fontFamily } = model.palette();
+      return model.neighbours(id).flatMap((other) => {
+        const style = model.nodeStyle(other);
+        if (style.hidden) return [];
+        const point = camera.toScreen(style.x, style.y);
+        const node: PlacedNode = { id: other, x: point.x, y: point.y, radius: screenRadius(style.size), style };
+        const toViewport = (box: LabelBox) => ({ ...box, left: box.left + rect.left, top: box.top + rect.top });
+        const dot = { left: node.x - node.radius, top: node.y - node.radius, width: node.radius * 2, height: node.radius * 2 };
+        return [{ dot: toViewport(dot), label: style.label ? toViewport(labelBox(placement(node, size, fontFamily))) : null }];
+      });
     },
     pickAt(clientX, clientY, pointerType) {
       const rect = canvas.getBoundingClientRect();

@@ -69,6 +69,8 @@ export type NodeStyle = {
   gap: RGBA;
   label: string | null;
   labelColor: RGBA;
+  /** The intro and filter fades, applied to the label so it never shows ahead of its dot. */
+  labelAlpha: number;
   /** In the hovered or selected neighbourhood: shown whatever the zoom. */
   forceLabel: boolean;
   /** Typed relations; busier notes win label collisions. */
@@ -318,6 +320,7 @@ export function createMapModel(data: GraphData, domains: string[]) {
       gap: palette.background,
       label: faded > 0.5 || presence < 0.5 ? null : attributes.label,
       labelColor: attributes.ghost ? palette.faint : mixColor(palette.mutedForeground, palette.foreground, contrast),
+      labelAlpha: intro * presence,
       forceLabel: inFocus && faded < 0.5,
       links: nodes.get(id)?.relationCount ?? 0,
       hub,
@@ -511,6 +514,8 @@ export function createMapModel(data: GraphData, domains: string[]) {
     labelOpacity,
     fieldLabels,
     clusterRegions,
+    /** The notes a hover on `id` keeps lit: its typed relations that are shown, without `id` itself. */
+    neighbours: (id: string) => [...(focusOf(id)?.nodes ?? [])].filter((other) => other !== id),
     /** The note whose neighbourhood is in focus: dragged, else hovered, else keyboard-focused, else selected. */
     focusCenter: () => {
       const center = focusCenter();

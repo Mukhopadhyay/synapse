@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { sameOverlay, type MapOverlay } from "@/lib/overlays";
+
 /** A camera position in graph units: the point at the centre of the screen and the zoom ratio (1 = 1px per unit). */
 export type SavedCamera = { x: number; y: number; ratio: number };
 
@@ -30,10 +32,8 @@ type MapState = {
   selectionSource: "url" | "page";
   cameraRequest: CameraRequest | null;
   insets: Insets;
-  /** Screen width covered on the left by the welcome card; fitting keeps the graph clear of it. */
-  leftInset: number;
-  /** Screen height covered at the bottom by the welcome sheet on phones. */
-  bottomInset: number;
+  /** Floating chrome over the map by id (welcome card, legend, controls); fitting and labels keep clear of it. */
+  overlays: Record<string, MapOverlay>;
   /** Reads the camera; set while the map is mounted. */
   readCamera: (() => SavedCamera) | null;
   /** Zoom and fit; set while the map is mounted. */
@@ -50,8 +50,8 @@ type MapState = {
   /** Mirror the URL after a load, Back or Forward, restoring that entry's camera when it has one. */
   syncFromUrl: (id: string | null, camera: SavedCamera | null) => void;
   setInsets: (insets: Insets) => void;
-  setLeftInset: (leftInset: number) => void;
-  setBottomInset: (bottomInset: number) => void;
+  /** Records where an overlay sits, or forgets it (null); unchanged boxes leave the state alone. */
+  setOverlay: (id: string, overlay: MapOverlay | null) => void;
   setCameraReader: (reader: (() => SavedCamera) | null) => void;
   setCommands: (commands: MapCommands | null) => void;
   setMapHidden: (hidden: boolean) => void;
@@ -71,8 +71,7 @@ export const useMapStore = create<MapState>()((set) => ({
   selectionSource: "url",
   cameraRequest: null,
   insets: { right: 0, bottom: 0 },
-  leftInset: 0,
-  bottomInset: 0,
+  overlays: {},
   readCamera: null,
   commands: null,
   mapHidden: false,
@@ -90,8 +89,14 @@ export const useMapStore = create<MapState>()((set) => ({
       cameraRequest: camera ? request({ camera }) : id ? request({ node: id }) : null,
     }),
   setInsets: (insets) => set({ insets }),
-  setLeftInset: (leftInset) => set({ leftInset }),
-  setBottomInset: (bottomInset) => set({ bottomInset }),
+  setOverlay: (id, overlay) =>
+    set((state) => {
+      if (overlay) return sameOverlay(state.overlays[id], overlay) ? state : { overlays: { ...state.overlays, [id]: overlay } };
+      if (!(id in state.overlays)) return state;
+      const rest = { ...state.overlays };
+      delete rest[id];
+      return { overlays: rest };
+    }),
   setCameraReader: (readCamera) => set({ readCamera }),
   setCommands: (commands) => set({ commands }),
   setMapHidden: (mapHidden) => set({ mapHidden }),
