@@ -2,15 +2,19 @@ import { create } from "zustand";
 
 import { mergeStored, readStored, writeStored } from "@/lib/storage";
 
+/** "auto" shows the minimap only for big graphs; "on" and "off" are the person's own choice. */
+export type MinimapChoice = "auto" | "on" | "off";
+
 type Prefs = {
   legendOpen: boolean;
   hintDismissed: boolean;
   welcomeDismissed: boolean;
-  /** The map's minimap, in the navigator and on phones. */
-  minimap: boolean;
+  /** The map's minimap, in the navigator and on phones. Saved booleans from before "auto" fail the type check and fall back to it. */
+  minimap: MinimapChoice;
 };
 
-const DEFAULTS: Prefs = { legendOpen: false, hintDismissed: false, welcomeDismissed: false, minimap: true };
+const DEFAULTS: Prefs = { legendOpen: false, hintDismissed: false, welcomeDismissed: false, minimap: "auto" };
+const MINIMAP_CHOICES: MinimapChoice[] = ["auto", "on", "off"];
 const STORAGE_KEY = "synapse-prefs";
 const STORAGE_VERSION = 1;
 
@@ -28,7 +32,8 @@ export const usePrefsStore = create<PrefsState>()((set, _get, store) => ({
   restored: false,
   set: (patch) => set(patch),
   restore() {
-    set({ ...mergeStored(DEFAULTS, readStored(STORAGE_KEY, STORAGE_VERSION)), restored: true });
+    const stored = mergeStored(DEFAULTS, readStored(STORAGE_KEY, STORAGE_VERSION));
+    set({ ...stored, minimap: MINIMAP_CHOICES.includes(stored.minimap) ? stored.minimap : DEFAULTS.minimap, restored: true });
     return store.subscribe(({ legendOpen, hintDismissed, welcomeDismissed, minimap }) =>
       writeStored(STORAGE_KEY, STORAGE_VERSION, { legendOpen, hintDismissed, welcomeDismissed, minimap }),
     );

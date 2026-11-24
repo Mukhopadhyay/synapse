@@ -10,6 +10,7 @@ export type ViewOffset = { dx: number; dy: number; zoom: number; angle: number }
 /** Where graph (0, 0) lands on screen and the screen step per graph unit along x and y. */
 export type ScreenBasis = { originX: number; originY: number; ux: number; uy: number; vx: number; vy: number };
 
+/** The closest zoom (fixed), and the furthest any fit may compute; the zoom-out limit itself follows Fit. */
 export const MIN_RATIO = 0.2;
 export const MAX_RATIO = 24;
 export const ZOOM_STEP = 1.5;
@@ -17,7 +18,6 @@ export const ZOOM_STEP = 1.5;
 const NO_OFFSET: ViewOffset = { dx: 0, dy: 0, zoom: 1, angle: 0 };
 
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
-export const clampRatio = (ratio: number) => Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio));
 
 /** A box a node and its label take up, in graph units and screen px. */
 export type FitItem = { x: number; y: number; radius: number; label: { width: number; height: number; gap: number } | null };
@@ -26,15 +26,19 @@ export type FitItem = { x: number; y: number; radius: number; label: { width: nu
  * The 2D camera: graph ↔ screen transforms, pans, zooms towards a point, and animated moves.
  * Besides position and zoom it keeps a rotation, left behind when the idle spin is baked in;
  * Fit and restored cameras ease it back to zero. `onChange(base)` runs after every change: `base`
- * is false when only the drift offset moved, so history saves can ignore it.
+ * is false when only the drift offset moved, so history saves can ignore it. `onAnimate` runs
+ * when an eased move (or its reduced-motion jump) begins, so hover can ignore the moving content.
  */
-export function createCamera(onChange: (base: boolean) => void) {
+export function createCamera(onChange: (base: boolean) => void, onAnimate: () => void = () => {}) {
   let state: Camera = { x: 0, y: 0, ratio: 1 };
   let angle = 0;
   let offset: ViewOffset = NO_OFFSET;
   let width = 0;
   let height = 0;
+  let maxRatio = MAX_RATIO;
   let cancelAnimation = () => {};
+
+  const clampRatio = (ratio: number) => Math.min(maxRatio, Math.max(MIN_RATIO, ratio));
 
   /** The view actually drawn: the camera with the drift offset applied. */
   const view = () => ({
@@ -73,6 +77,7 @@ export function createCamera(onChange: (base: boolean) => void) {
   /** Eases to `target`; the rotation eases to `targetAngle` (zero unless given). */
   function animate(target: Partial<Camera>, duration = movementDuration(DURATION.camera), targetAngle = 0) {
     cancelAnimation();
+    onAnimate();
     const from = { ...state };
     const fromAngle = angle;
     const to = { ...state, ...target, ratio: clampRatio(target.ratio ?? state.ratio) };
@@ -198,6 +203,10 @@ export function createCamera(onChange: (base: boolean) => void) {
       angle += offset.angle;
       offset = NO_OFFSET;
       set(next);
+    },
+    /** The furthest the camera may zoom out (graph units per px), within the fixed bounds. */
+    setMaxRatio(ratio: number) {
+      maxRatio = Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio));
     },
     resize(nextWidth: number, nextHeight: number) {
       width = nextWidth;
