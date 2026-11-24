@@ -72,11 +72,20 @@ describe("graph.json", () => {
     assert.equal(data.nodes.find((node) => node.id === "gamma")?.title, "GAMMA function");
     assert.equal(data.nodes.find((node) => node.id === "alpha")?.relationCount, 2);
     assert.ok(data.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y)));
-    assert.ok(data.edges.some((edge) => edge.kind === "mentions" && edge.source === "alpha" && edge.target === "beta"));
+    assert.ok(data.edges.some((edge) => edge.kind === "requires" && edge.source === "alpha" && edge.target === "beta"));
     assert.match(data.template, /\{\{title\}\}/);
 
     const index = JSON.parse(await readFile(path.join(await dir, "search-index.json"), "utf8"));
     assert.equal(index.documentCount, 3);
+  });
+
+  it("drops a mention when the same pair already has a typed relation, in either direction", async () => {
+    const out = path.join(await dir, "mentions.json");
+    const { code, output } = await build("mentions", ["--out", out, "--bodies", path.join(await dir, "mentions-bodies")]);
+    assert.equal(code, 0, output);
+    const data: GraphData = JSON.parse(await readFile(out, "utf8"));
+    const edges = data.edges.map(({ source, target, kind }) => `${source} ${kind} ${target}`).sort();
+    assert.deepEqual(edges, ["alpha requires beta", "beta mentions gamma"]);
   });
 });
 

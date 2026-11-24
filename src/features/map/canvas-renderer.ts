@@ -1,4 +1,4 @@
-import { LINE_DASHES } from "@/lib/content/relations";
+import { ARROW_SIZE, LINE_DASHES } from "@/lib/content/relations";
 import { useSearchStore } from "@/features/search/search-store";
 import { useMapStore, type Insets } from "@/lib/store/map-store";
 
@@ -31,8 +31,6 @@ import type { MapRenderer } from "./renderer";
 
 /** Minimum hit radius in px, whatever the drawn size. */
 const HIT_RADIUS = { mouse: 12, touch: 24 };
-const ARROW_LENGTH = 6;
-const ARROW_WIDTH = 4.5;
 const FOCUS_RING_GAP = 3;
 /** Space kept clear around the graph when fitting: below the top bar, above the legend and hint, and at the sides. */
 const FIT_MARGIN = { top: 72, bottom: 60, side: 24 };
@@ -164,7 +162,7 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       const ux = dx / length;
       const uy = dy / length;
       const tip = { x: to.x - ux * to.radius, y: to.y - uy * to.radius };
-      const arrowLength = style.head === "none" ? 0 : Math.max(1, style.width) * ARROW_LENGTH;
+      const arrowLength = style.head === "none" ? 0 : Math.max(1, style.width) * ARROW_SIZE.length;
       const key = `${style.zIndex}|${style.color.join(",")}|${style.width}|${style.line}`;
       const batch = batches.get(key) ?? { style, segments: [] };
       batch.segments.push(from.x + ux * from.radius, from.y + uy * from.radius, tip.x - ux * arrowLength, tip.y - uy * arrowLength);
@@ -187,8 +185,8 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
 
     for (const { style, tip, ux, uy } of heads) {
       const scale = Math.max(1, style.width);
-      const arrowLength = scale * ARROW_LENGTH;
-      const halfWidth = (scale * ARROW_WIDTH) / 2;
+      const arrowLength = scale * ARROW_SIZE.length;
+      const halfWidth = (scale * ARROW_SIZE.width) / 2;
       const base = { x: tip.x - ux * arrowLength, y: tip.y - uy * arrowLength };
       ctx.beginPath();
       ctx.moveTo(tip.x, tip.y);
@@ -202,7 +200,7 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       } else {
         ctx.fillStyle = cssColor(palette.background);
         ctx.fill();
-        ctx.lineWidth = 1;
+        ctx.lineWidth = scale;
         ctx.strokeStyle = color;
         ctx.stroke();
       }

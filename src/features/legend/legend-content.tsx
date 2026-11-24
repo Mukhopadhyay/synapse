@@ -3,7 +3,7 @@
 import { NodeDot } from "@/components/node-dot";
 import { Separator } from "@/components/ui/separator";
 import { useFilterStore } from "@/features/filters/filter-store";
-import { EDGE_KINDS, edgeDefinition } from "@/lib/content/relations";
+import { directionHint, EDGE_KINDS, edgeDefinition } from "@/lib/content/relations";
 import type { GraphDomain } from "@/lib/content/schema";
 
 import { EdgeSample } from "./edge-sample";
@@ -47,8 +47,8 @@ export function groupsHeading(domains: GraphDomain[]) {
 }
 
 /**
- * The legend's sections: clusters (or fields), relations drawn in their real line styles, and
- * unwritten notes. Every row is a toggle on the shared filter store, so the legend and the
+ * The legend's sections: clusters (or fields), relations drawn in their real line styles and
+ * arrowheads with a line saying which way arrows run, and unwritten notes. Every row is a toggle on the shared filter store, so the legend and the
  * settings panel never disagree. `header` replaces the first heading (the floating card puts its
  * collapse button there).
  */
@@ -74,6 +74,7 @@ export function LegendContent({ domains, header }: { domains: GraphDomain[]; hea
           />
         ))}
       </div>
+      <p className="mt-1.5 px-1 text-meta text-faint">{directionHint()}</p>
       <Separator className="mt-2.5 mb-1.5" />
       <LegendRow on={ghosts} onToggle={() => set({ ghosts: !ghosts })} sample={<NodeDot color="domain-1" tint={0} ghost className="size-2.5" />} label="Not written yet" />
     </div>

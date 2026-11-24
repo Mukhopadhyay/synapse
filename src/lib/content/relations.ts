@@ -6,6 +6,9 @@
 
 export type LineStyle = "solid" | "dashed" | "dash-dot" | "dotted";
 
+/** The head drawn at an edge's target: filled for "requires", hollow for "is a kind of", none for undirected kinds. */
+export type ArrowHead = "filled" | "hollow" | "none";
+
 export type RelationDefinition = {
   label: string;
   /** Group label for incoming edges of a directed relation: "Required by". */
@@ -16,6 +19,7 @@ export type RelationDefinition = {
   /** Cycles in this relation fail the build. */
   acyclic: boolean;
   line: LineStyle;
+  arrow: ArrowHead;
   /** Line width in px at rest. */
   width: number;
   /** Off in the legend and filters until someone turns it on. */
@@ -23,10 +27,10 @@ export type RelationDefinition = {
 };
 
 export const RELATIONS = {
-  requires: { label: "Requires", inverseLabel: "Required by", verb: "requires", directed: true, acyclic: true, line: "solid", width: 1 },
-  extends: { label: "Extends", inverseLabel: "Extended by", verb: "extends", directed: true, acyclic: true, line: "solid", width: 1.5 },
-  related: { label: "Related", verb: "is related to", directed: false, acyclic: false, line: "dashed", width: 0.75 },
-  contrasts: { label: "Contrasts", verb: "contrasts", directed: false, acyclic: false, line: "dash-dot", width: 0.75 },
+  requires: { label: "Requires", inverseLabel: "Required by", verb: "requires", directed: true, acyclic: true, line: "solid", arrow: "filled", width: 1 },
+  extends: { label: "Extends", inverseLabel: "Extended by", verb: "extends", directed: true, acyclic: true, line: "solid", arrow: "hollow", width: 1.5 },
+  related: { label: "Related", verb: "is related to", directed: false, acyclic: false, line: "dashed", arrow: "none", width: 0.75 },
+  contrasts: { label: "Contrasts", verb: "contrasts", directed: false, acyclic: false, line: "dash-dot", arrow: "none", width: 0.75 },
 } as const satisfies Record<string, RelationDefinition>;
 
 export type RelationKey = keyof typeof RELATIONS;
@@ -41,6 +45,7 @@ export const MENTIONS = {
   directed: true,
   acyclic: false,
   line: "dotted",
+  arrow: "none",
   width: 0.75,
   hiddenByDefault: true,
 } as const satisfies RelationDefinition;
@@ -58,8 +63,19 @@ export const LINE_DASHES: Record<LineStyle, number[]> = {
   dotted: [1.5, 2.5],
 };
 
+/** Arrowhead size in px for a 1px line; heads grow with wider lines. Shared by the map and the legend samples. */
+export const ARROW_SIZE = { length: 6, width: 4.5 };
+
 export function edgeDefinition(kind: EdgeKind): RelationDefinition {
   return kind === "mentions" ? MENTIONS : RELATIONS[kind];
+}
+
+/** The legend's reading of an arrow, from every kind drawn with a head: "A → B: A requires or extends B". */
+export function directionHint() {
+  const verbs = EDGE_KINDS.map(edgeDefinition)
+    .filter((definition) => definition.arrow !== "none")
+    .map((definition) => definition.verb);
+  return `A → B: A ${new Intl.ListFormat("en", { type: "disjunction" }).format(verbs)} B`;
 }
 
 /** A note whose body prose (code blocks and headings excluded) is shorter than this is a stub. */
