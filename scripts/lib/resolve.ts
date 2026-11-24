@@ -31,6 +31,7 @@ function mostCommon(values: (string | undefined)[]): string | undefined {
 /**
  * Turns loaded notes into nodes and edges: resolves every relation and wikilink target,
  * creates ghost nodes for targets that don't exist yet, and reports duplicates, self-links and typos.
+ * A wikilink between two notes that already share a typed relation (either way) adds no mention edge.
  */
 export function resolveGraph(notes: LoadedNote[], report: Report, ghostTitles: Map<string, { title: string; file: string }> = new Map()) {
   const bySlug = new Map<string, LoadedNote>();
@@ -110,6 +111,10 @@ export function resolveGraph(notes: LoadedNote[], report: Report, ghostTitles: M
     }
   }
 
+  const pairKey = (edge: GraphEdge) => [edge.source, edge.target].sort().join("~");
+  const typedPairs = new Set(edges.filter((edge) => edge.kind !== "mentions").map(pairKey));
+  const keptEdges = edges.filter((edge) => edge.kind !== "mentions" || !typedPairs.has(pairKey(edge)));
+
   const nodes: DraftNode[] = [...bySlug.values()].map((note) => ({
     id: note.slug,
     title: note.frontmatter.title,
@@ -144,5 +149,5 @@ export function resolveGraph(notes: LoadedNote[], report: Report, ghostTitles: M
     else if (!ghosts.has(slug)) report.warn(file, `ghosts: nothing links to "${slug}", so this title isn't used.`);
   }
 
-  return { nodes, edges, files: new Map([...bySlug].map(([slug, note]) => [slug, note.file])) };
+  return { nodes, edges: keptEdges, files: new Map([...bySlug].map(([slug, note]) => [slug, note.file])) };
 }

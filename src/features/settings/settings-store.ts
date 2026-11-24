@@ -15,7 +15,7 @@ export type DisplaySettings = {
   linkThickness: number;
 };
 
-export const DISPLAY_DEFAULTS: DisplaySettings = { arrows: false, textFade: 0, nodeSize: 1, linkThickness: 1 };
+export const DISPLAY_DEFAULTS: DisplaySettings = { arrows: true, textFade: 0, nodeSize: 1, linkThickness: 1 };
 
 export const DISPLAY_RANGES = {
   textFade: { min: -3, max: 3, step: 0.1 },
@@ -28,7 +28,7 @@ export type Group = { id: string; query: string; color: DomainColor };
 
 const STORAGE_KEY = "synapse-graph-settings";
 /** Bump when the stored shape or defaults change; older saved values are then ignored. */
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 
 type SettingsState = {
   forces: ForceSettings;

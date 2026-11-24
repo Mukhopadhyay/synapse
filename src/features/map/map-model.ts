@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/features/settings/settings-store";
 import { subscribeTheme } from "@/features/theme/theme-store";
 import {
   edgeDefinition,
+  type ArrowHead,
   type EdgeKind,
   type GraphData,
   type GraphNode,
@@ -44,7 +45,7 @@ export type EdgeAttributes = { kind: MapEdgeKind };
 export const TAG_PREFIX = "tag:";
 export const isTagNode = (id: string) => id.startsWith(TAG_PREFIX);
 
-const TAG_EDGE: RelationDefinition = { label: "Tagged", verb: "is tagged", directed: false, acyclic: false, line: "solid", width: 0.5 };
+const TAG_EDGE: RelationDefinition = { label: "Tagged", verb: "is tagged", directed: false, acyclic: false, line: "solid", arrow: "none", width: 0.5 };
 const mapEdgeDefinition = (kind: MapEdgeKind) => (kind === "tag" ? TAG_EDGE : edgeDefinition(kind));
 const edgeOn = (edges: Filters["edges"], kind: MapEdgeKind) => kind === "tag" || edges[kind];
 
@@ -84,8 +85,6 @@ export type NodeStyle = {
   zIndex: number;
 };
 
-export type EdgeHead = "none" | "filled" | "hollow";
-
 export type EdgeStyle = {
   source: string;
   target: string;
@@ -94,7 +93,7 @@ export type EdgeStyle = {
   hidden: boolean;
   color: RGBA;
   width: number;
-  head: EdgeHead;
+  head: ArrowHead;
   line: LineStyle;
   zIndex: number;
 };
@@ -338,7 +337,7 @@ export function createMapModel(data: GraphData, domains: string[]) {
     const focusTo = touchesCenter(fade.to, source, target);
     const focus = lerp(touchesCenter(fade.from, source, target), focusTo, fade.progress);
     const faded = lerp(edgeFaded(fade.from, source, target), edgeFaded(fade.to, source, target), fade.progress);
-    const showHead = definition.directed && (arrows || focusTo === 1);
+    const showHead = definition.arrow !== "none" && (arrows || focusTo === 1);
     const presence = edgePresence(kind, source, target);
 
     return {
@@ -349,7 +348,7 @@ export function createMapModel(data: GraphData, domains: string[]) {
       hidden: presence === 0,
       color: scaleAlpha(mixColor(palette.edgeRest, palette.edgeFocus, focus), (1 - faded * (1 - OPACITY_FADED)) * intro * presence),
       width: (definition.width + 0.5 * focus) * linkThickness,
-      head: showHead ? (kind === "extends" ? "hollow" : "filled") : "none",
+      head: showHead ? definition.arrow : "none",
       line: definition.line,
       zIndex: focus > 0.5 ? 1 : 0,
     };
