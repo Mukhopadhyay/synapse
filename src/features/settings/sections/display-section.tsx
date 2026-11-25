@@ -13,6 +13,7 @@ export function DisplaySection() {
   return (
     <SettingsSection title="Display">
       <SwitchRow label="Arrows" checked={display.arrows} onChange={(arrows) => setDisplay("arrows", arrows)} />
+      <SwitchRow label="Show studied" checked={display.studied} onChange={(studied) => setDisplay("studied", studied)} />
       <SliderRow label="Node size" value={display.nodeSize} range={DISPLAY_RANGES.nodeSize} format={times} onChange={(value) => setDisplay("nodeSize", value)} />
       <SliderRow label="Link thickness" value={display.linkThickness} range={DISPLAY_RANGES.linkThickness} format={times} onChange={(value) => setDisplay("linkThickness", value)} />
       <SettingsSubsection title="Advanced">

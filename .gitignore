@@ -4,6 +4,9 @@ notes/*
 docs/*
 COMPROMISES.md
 
+# Temporarily ignoring dsa content as they're not ready for public consumption yet. Will be re-added once ready.
+content/dsa
+
 # dependencies
 /node_modules
 /.pnp

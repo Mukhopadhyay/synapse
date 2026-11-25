@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { NodeDot } from "@/components/node-dot";
+import { StudiedDate, StudiedToggle } from "@/features/progress/studied-toggle";
 import { LEVEL_LABELS } from "@/lib/content/relations";
 import type { NoteView } from "@/lib/graph/note-view";
 import { useMapStore } from "@/lib/store/map-store";
@@ -45,6 +46,7 @@ export function NoteHeader({ view }: { view: NoteView }) {
           </>
         ) : (
           <>
+            <StudiedToggle slug={node.id} />
             {node.level && <Chip>{LEVEL_LABELS[node.level]}</Chip>}
             <Chip>
               {node.relationCount} {node.relationCount === 1 ? "relation" : "relations"}
@@ -58,6 +60,7 @@ export function NoteHeader({ view }: { view: NoteView }) {
           </>
         )}
       </div>
+      {!node.ghost && <StudiedDate slug={node.id} />}
     </header>
   );
 }

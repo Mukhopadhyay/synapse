@@ -2,6 +2,7 @@ import Graph from "graphology";
 
 import { useFilterStore, type Filters } from "@/features/filters/filter-store";
 import { useQueryMatches } from "@/features/filters/query-matches";
+import { useProgressStore } from "@/features/progress/progress-store";
 import { useGroupColors } from "@/features/settings/group-colors";
 import { useSettingsStore } from "@/features/settings/settings-store";
 import { subscribeTheme } from "@/features/theme/theme-store";
@@ -60,6 +61,8 @@ export type NodeStyle = {
   ghost: boolean;
   selected: boolean;
   focused: boolean;
+  /** Marked as studied and "Show studied" is on: drawn with a ring. */
+  studied: boolean;
   /** Hovered or selected: the label sits on a pill. */
   pinned: boolean;
   fill: RGBA;
@@ -67,6 +70,7 @@ export type NodeStyle = {
   stroke: RGBA;
   ring: RGBA;
   gap: RGBA;
+  studiedRing: RGBA;
   label: string | null;
   labelColor: RGBA;
   /** The intro and filter fades, applied to the label so it never shows ahead of its dot. */
@@ -313,11 +317,13 @@ export function createMapModel(data: GraphData, domains: string[]) {
       ghost: attributes.ghost,
       selected,
       focused: id === focusedId,
+      studied: !attributes.ghost && presence > 0 && useSettingsStore.getState().display.studied && useProgressStore.getState().studiedSet.has(id),
       pinned,
       fill: attributes.ghost ? palette.background : mixColor(palette.background, nodeColor, visibility),
       stroke: scaleAlpha(palette.faint, 0.8 * visibility),
       ring: palette.signal,
       gap: palette.background,
+      studiedRing: scaleAlpha(palette.success, visibility),
       label: faded > 0.5 || presence < 0.5 ? null : attributes.label,
       labelColor: attributes.ghost ? palette.faint : mixColor(palette.mutedForeground, palette.foreground, contrast),
       labelAlpha: intro * presence,
@@ -465,6 +471,9 @@ export function createMapModel(data: GraphData, domains: string[]) {
     const unsubscribeFilters = useFilterStore.subscribe(refilter);
     const unsubscribeMatches = useQueryMatches.subscribe(refilter);
     const unsubscribeGroups = useGroupColors.subscribe(() => listener.restyle());
+    const unsubscribeProgress = useProgressStore.subscribe((state, previous) => {
+      if (state.studiedSet !== previous.studiedSet) listener.restyle();
+    });
 
     let cancelFade = () => {};
     const unsubscribeStore = useMapStore.subscribe((state, previous) => {
@@ -494,6 +503,7 @@ export function createMapModel(data: GraphData, domains: string[]) {
       unsubscribeFilters();
       unsubscribeMatches();
       unsubscribeGroups();
+      unsubscribeProgress();
       unsubscribeTheme();
       unsubscribeSettings();
       stopLayout();

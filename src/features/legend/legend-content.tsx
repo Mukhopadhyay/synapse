@@ -2,6 +2,8 @@
 
 import { NodeDot } from "@/components/node-dot";
 import { Separator } from "@/components/ui/separator";
+import { StudiedRingSample } from "./studied-ring-sample";
+import { useSettingsStore } from "@/features/settings/settings-store";
 import { useFilterStore } from "@/features/filters/filter-store";
 import { directionHint, EDGE_KINDS, edgeDefinition } from "@/lib/content/relations";
 import type { GraphDomain } from "@/lib/content/schema";
@@ -54,6 +56,7 @@ export function groupsHeading(domains: GraphDomain[]) {
  */
 export function LegendContent({ domains, header }: { domains: GraphDomain[]; header?: React.ReactNode }) {
   const { edges, ghosts, toggleEdge, set } = useFilterStore();
+  const showStudied = useSettingsStore((state) => state.display.studied);
 
   return (
     <div className="flex flex-col">
@@ -77,6 +80,12 @@ export function LegendContent({ domains, header }: { domains: GraphDomain[]; hea
       <p className="mt-1.5 px-1 text-meta text-faint">{directionHint()}</p>
       <Separator className="mt-2.5 mb-1.5" />
       <LegendRow on={ghosts} onToggle={() => set({ ghosts: !ghosts })} sample={<NodeDot color="domain-1" tint={0} ghost className="size-2.5" />} label="Not written yet" />
+      {showStudied && (
+        <p className="flex h-7 items-center gap-2 px-1 text-ui-small font-normal text-muted-foreground">
+          <StudiedRingSample />
+          Studied
+        </p>
+      )}
     </div>
   );
 }

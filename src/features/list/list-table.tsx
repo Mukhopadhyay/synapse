@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 import { NodeDot } from "@/components/node-dot";
+import { Checkbox } from "@/components/ui/checkbox";
+import { markStudied } from "@/features/progress/mark-studied";
 import { Chip } from "@/components/ui/chip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { noteHref } from "@/lib/content/note-url";
@@ -11,7 +13,8 @@ import { cn } from "@/lib/utils";
 
 import { STATUS_LABELS, type ListRow, type Sort, type SortKey, type Status } from "./list-rows";
 
-const COLUMNS: { key: SortKey; label: string; numeric?: boolean; className?: string }[] = [
+const COLUMNS: { key: SortKey; label: string; numeric?: boolean; className?: string; srOnly?: boolean }[] = [
+  { key: "studied", label: "Studied", className: "w-12 pr-0 @max-[34rem]:w-10", srOnly: true },
   { key: "title", label: "Title" },
   { key: "cluster", label: "Cluster", className: "w-[16%] @max-[44rem]:hidden" },
   { key: "level", label: "Level", className: "w-36 @max-[34rem]:hidden" },
@@ -38,7 +41,7 @@ function SortHeader({ column, sort, onSort }: { column: (typeof COLUMNS)[number]
           column.numeric && "flex-row-reverse",
         )}
       >
-        {column.label}
+        {column.srOnly ? <span className="sr-only">{column.label}</span> : column.label}
         <Icon aria-hidden className={cn("size-icon shrink-0", active ? "text-foreground" : "opacity-0 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100")} />
       </button>
     </TableHead>
@@ -59,12 +62,15 @@ export function ListTable({ rows, sort, onSort, selectedId }: { rows: ListRow[];
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map(({ node, ref, cluster, level, status }) => (
+          {rows.map(({ node, ref, cluster, level, status, studied }) => (
             <TableRow
               key={node.id}
               data-state={node.id === selectedId ? "selected" : undefined}
               className="relative h-10 border-border text-ui font-normal hover:bg-surface-raised data-[state=selected]:bg-surface-raised"
             >
+              <TableCell className="relative z-10 py-2 pr-0 pl-4 @max-[34rem]:pl-3">
+                {!node.ghost && <Checkbox checked={studied} onCheckedChange={(checked) => markStudied(node.id, checked === true)} aria-label={`${node.title}: studied`} />}
+              </TableCell>
               <TableCell className="px-4 py-2.5 @max-[34rem]:px-3">
                 <Link
                   href={noteHref(node.domain, node.id, "list")}

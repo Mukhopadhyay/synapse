@@ -3,6 +3,7 @@ import { MenuLegend } from "@/features/legend/menu-legend";
 import { ListView } from "@/features/list/list-view";
 import { MapCanvas } from "@/features/map/map-canvas";
 import { UrlSync } from "@/features/navigation/url-sync";
+import { StudiedHotkey } from "@/features/progress/studied-hotkey";
 import { SearchPalette } from "@/features/search/search-palette";
 import { MenuSettings } from "@/features/settings/menu-settings";
 import { Splash } from "@/features/splash/splash";
@@ -45,6 +46,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <SearchPalette />
       <UrlSync />
       <RestoreSaved />
+      <StudiedHotkey />
       <Splash />
     </div>
   );

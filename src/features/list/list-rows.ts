@@ -4,21 +4,21 @@ import { noteRef, type NoteRef } from "@/lib/graph/note-view";
 
 export type Status = "written" | "stub" | "ghost";
 export type StatusFilter = "all" | Status;
-export type SortKey = "title" | "cluster" | "level" | "relations" | "status";
+export type SortKey = "title" | "cluster" | "level" | "relations" | "status" | "studied";
 export type Sort = { key: SortKey; direction: "asc" | "desc" };
 
-export type ListRow = { node: GraphNode; ref: NoteRef; cluster: string; level: string; status: Status };
+export type ListRow = { node: GraphNode; ref: NoteRef; cluster: string; level: string; status: Status; studied: boolean };
 
 export const STATUS_LABELS: Record<Status, string> = { written: "Written", stub: "Stub", ghost: "Not written" };
 
 const statusOf = (node: GraphNode): Status => (node.ghost ? "ghost" : node.stub ? "stub" : "written");
 
-export function listRows(data: GraphData, domain: string): ListRow[] {
+export function listRows(data: GraphData, domain: string, studied: ReadonlySet<string>): ListRow[] {
   return data.nodes
     .filter((node) => node.domain === domain)
     .map((node) => {
       const ref = noteRef(data, node);
-      return { node, ref, cluster: ref.clusterName ?? "", level: node.level ? LEVEL_LABELS[node.level] : "", status: statusOf(node) };
+      return { node, ref, cluster: ref.clusterName ?? "", level: node.level ? LEVEL_LABELS[node.level] : "", status: statusOf(node), studied: studied.has(node.id) };
     });
 }
 
@@ -33,6 +33,7 @@ export function sortRows(rows: ListRow[], { key, direction }: Sort) {
     level: (a, b) => levelRank(a) - levelRank(b),
     relations: (a, b) => a.node.relationCount - b.node.relationCount,
     status: (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
+    studied: (a, b) => Number(a.studied) - Number(b.studied),
   };
   const sign = direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => sign * compare[key](a, b) || sign * (key === "title" ? a.node.title.localeCompare(b.node.title) : 0) || a.node.title.localeCompare(b.node.title));
