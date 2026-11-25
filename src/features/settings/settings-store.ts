@@ -13,9 +13,11 @@ export type DisplaySettings = {
   nodeSize: number;
   /** Multiplies every edge's width. */
   linkThickness: number;
+  /** A ring on notes marked as studied; off hides the rings without touching progress. */
+  studied: boolean;
 };
 
-export const DISPLAY_DEFAULTS: DisplaySettings = { arrows: true, textFade: 0, nodeSize: 1, linkThickness: 1 };
+export const DISPLAY_DEFAULTS: DisplaySettings = { arrows: true, textFade: 0, nodeSize: 1, linkThickness: 1, studied: true };
 
 export const DISPLAY_RANGES = {
   textFade: { min: -3, max: 3, step: 0.1 },

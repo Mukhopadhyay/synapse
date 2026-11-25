@@ -37,3 +37,15 @@ export function mergeStored<T extends Record<string, unknown>>(defaults: T, stor
   }
   return result as T;
 }
+
+/** Whether this browser lets the page save anything; false in private modes and with site data blocked. */
+export function storageWorks() {
+  try {
+    const probe = "synapse-probe";
+    window.localStorage.setItem(probe, "1");
+    window.localStorage.removeItem(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}

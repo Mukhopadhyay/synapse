@@ -34,6 +34,11 @@ import { zoomOutLimit } from "./zoom";
 /** Minimum hit radius in px, whatever the drawn size. */
 const HIT_RADIUS = { mouse: 12, touch: 24 };
 const FOCUS_RING_GAP = 3;
+/** The studied ring: 1.5px, drawn 2px outside the node and inside the keyboard focus ring. */
+const STUDIED_RING_OFFSET = 2.75;
+const STUDIED_RING_WIDTH = 1.5;
+/** With the selection ring around it, the studied ring sits in its 3px gap. */
+const STUDIED_RING_IN_SELECTION = 1.5;
 /** Space kept clear around the graph when fitting: below the top bar, above the hint, and past the sides and any overlay. */
 const FIT_MARGIN = { top: 72, bottom: 60, side: 24 };
 const NO_INSETS: Insets = { right: 0, bottom: 0 };
@@ -247,6 +252,12 @@ export function createCanvasRenderer(canvases: MapCanvases, model: MapModel): Ma
       ctx.strokeStyle = cssColor(style.stroke);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+    if (style.studied) {
+      circle(ctx, x, y, inner + (style.selected ? STUDIED_RING_IN_SELECTION : STUDIED_RING_OFFSET));
+      ctx.lineWidth = STUDIED_RING_WIDTH;
+      ctx.strokeStyle = cssColor(style.studiedRing);
+      ctx.stroke();
     }
     if (style.focused) {
       circle(ctx, x, y, radius + FOCUS_RING_GAP + 1);

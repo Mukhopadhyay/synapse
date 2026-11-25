@@ -1,6 +1,7 @@
 "use client";
 
 import { noteHref } from "@/lib/content/note-url";
+import { useProgressStore } from "@/features/progress/progress-store";
 import { openNote } from "@/features/panel/use-note-link";
 
 import type { MapController } from "./map-controller";
@@ -10,6 +11,7 @@ import type { MapController } from "./map-controller";
  * order (the map itself is Tab-navigable), but reachable with a screen reader's reading cursor.
  */
 export function NotesList({ controller }: { controller: MapController }) {
+  const studied = useProgressStore((state) => state.studiedSet);
   return (
     <nav aria-label="All notes on this map" className="sr-only">
       <ul>
@@ -21,6 +23,7 @@ export function NotesList({ controller }: { controller: MapController }) {
               <a href={noteHref(node.domain, id)} tabIndex={-1} onClick={(event) => openNote(event, id)}>
                 {node.title}, {controller.breadcrumb(id)}
                 {node.ghost ? ", not written yet" : ""}
+                {studied.has(id) ? ", studied" : ""}
               </a>
             </li>
           );

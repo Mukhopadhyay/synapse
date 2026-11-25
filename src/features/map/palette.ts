@@ -15,6 +15,8 @@ export type Palette = {
   mutedForeground: RGBA;
   faint: RGBA;
   signal: RGBA;
+  /** The ring on studied notes. */
+  success: RGBA;
   edgeRest: RGBA;
   edgeFocus: RGBA;
   /** Backdrop dot grid and edge vignette. */
@@ -104,6 +106,7 @@ export function resolvePalette(domains: GraphDomain[]): Palette {
     mutedForeground: toRgba(token("muted-foreground")),
     faint: toRgba(token("faint")),
     signal: toRgba(token("signal")),
+    success: toRgba(token("success")),
     edgeRest: toRgba(token("edge-rest")),
     edgeFocus: toRgba(token("edge-focus")),
     grid: toRgba(token("grid-dot")),

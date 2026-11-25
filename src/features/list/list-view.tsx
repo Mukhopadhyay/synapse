@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 
+import { useProgressStore } from "@/features/progress/progress-store";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { parseGraphPath } from "@/lib/content/note-url";
@@ -50,12 +51,13 @@ function ListBody({ domainId, initialStatus }: { domainId: string; initialStatus
   const data = useGraphStore((state) => state.data);
   const selectedId = useMapStore((state) => state.selectedId);
   const panelInset = useMapStore((state) => (state.selectedId ? state.insets.right : 0));
+  const studiedSet = useProgressStore((state) => state.studiedSet);
   const [text, setText] = useState("");
   const [status, setStatus] = useState<StatusFilter>(initialStatus);
   const [sort, setSort] = useState<Sort>({ key: "relations", direction: "desc" });
 
   const domain = data?.domains.find((entry) => entry.id === domainId);
-  const all = useMemo(() => (data && domain ? listRows(data, domain.id) : []), [data, domain]);
+  const all = useMemo(() => (data && domain ? listRows(data, domain.id, studiedSet) : []), [data, domain, studiedSet]);
   const rows = useMemo(() => {
     const needle = text.trim().toLowerCase();
     const filtered = all.filter(
@@ -71,6 +73,7 @@ function ListBody({ domainId, initialStatus }: { domainId: string; initialStatus
   const written = all.filter((row) => row.status !== "ghost").length;
   const stubs = all.filter((row) => row.status === "stub").length;
   const ghosts = all.length - written;
+  const studied = all.filter((row) => row.studied).length;
   const onSort = (key: SortKey) =>
     setSort((current) => ({ key, direction: current.key === key ? (current.direction === "asc" ? "desc" : "asc") : key === "title" || key === "cluster" ? "asc" : "desc" }));
 
@@ -84,7 +87,7 @@ function ListBody({ domainId, initialStatus }: { domainId: string; initialStatus
           <div className="flex flex-col">
             <h1 className="text-note-heading text-foreground">{domain.name} notes</h1>
             <p className="mt-1 text-ui-small font-normal text-faint tabular-nums">
-              {plural(written, "note")} · {plural(stubs, "stub")} · {ghosts} not written yet
+              {plural(written, "note")} · {plural(stubs, "stub")} · {ghosts} not written yet · {studied} studied
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ExternalLink, Link2, PanelRightOpen, Pencil } from "lucide-react";
+import { Check, ExternalLink, Link2, PanelRightOpen, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { markStudied } from "@/features/progress/mark-studied";
+import { useProgressStore } from "@/features/progress/progress-store";
 import { contributeUrl } from "@/lib/content/contribute-url";
 import { noteHref } from "@/lib/content/note-url";
 import { useGraphStore } from "@/lib/store/graph-store";
@@ -29,6 +31,7 @@ export function NodeContextMenu({ controller, children }: { controller: MapContr
   const [target, setTarget] = useState<string | null>(null);
   const template = useGraphStore((state) => state.data?.template ?? "");
   const node = target ? controller.node(target) : undefined;
+  const studied = useProgressStore((state) => (target ? state.studiedSet.has(target) : false));
 
   function onContextMenu(event: React.MouseEvent) {
     const hit = controller.pickAt(event.clientX, event.clientY, "mouse");
@@ -65,6 +68,12 @@ export function NodeContextMenu({ controller, children }: { controller: MapContr
             <Link2 aria-hidden />
             Copy link
           </ContextMenuItem>
+          {!node.ghost && (
+            <ContextMenuItem onSelect={() => markStudied(node.id, !studied)}>
+              <Check aria-hidden />
+              {studied ? "Mark as not studied" : "Mark as studied"}
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem asChild>
             <a href={contributeUrl(node, template)} target="_blank" rel="noreferrer">

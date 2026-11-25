@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { useProgressStore } from "@/features/progress/progress-store";
 import { Chip } from "@/components/ui/chip";
 import { LEVEL_LABELS } from "@/lib/content/relations";
 import { useMapStore } from "@/lib/store/map-store";
@@ -30,6 +31,7 @@ export function HoverCard({ controller }: { controller: MapController }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [placed, setPlaced] = useState<(HoverPlacement & { id: string }) | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const studied = useProgressStore((state) => (hoveredId ? state.studiedSet.has(hoveredId) : false));
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -84,6 +86,7 @@ export function HoverCard({ controller }: { controller: MapController }) {
         <Chip>
           {node.relationCount} {node.relationCount === 1 ? "relation" : "relations"}
         </Chip>
+        {studied && <Chip variant="outline">Studied</Chip>}
       </div>
     </div>
   );
